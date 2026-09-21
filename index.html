@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Escape the Academy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js" onerror="window.__phaserPrimaryFailed = true;"></script>
+<style>
+  :root {
+    --ink: #0f1220;
+    --ink-2: #171b30;
+    --parchment: #f4ecd8;
+    --brass: #d9a441;
+    --brass-dim: #a67c2e;
+    --wood: #6b4226;
+    --teal: #4fd1c5;
+    --danger: #e2574c;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: radial-gradient(ellipse at top, #1b2040 0%, var(--ink) 65%);
+    color: var(--parchment);
+    font-family: 'Space Grotesk', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 18px 12px calc(18px + env(safe-area-inset-bottom, 0px));
+    overflow-x: hidden;
+  }
+
+  header { text-align: center; max-width: 640px; }
+
+  h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(16px, 4vw, 26px);
+    letter-spacing: 1px;
+    color: var(--brass);
+    margin: 0 0 8px 0;
+    text-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+  }
+
+  header p { margin: 0; color: rgba(244,236,216,0.7); font-size: 14px; line-height: 1.5; }
+
+  #game-shell {
+    position: relative;
+    width: min(960px, 100%);
+    aspect-ratio: 16 / 9;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 0 3px var(--brass-dim), 0 0 0 6px var(--wood), 0 20px 60px rgba(0,0,0,0.6);
+    background: var(--ink-2);
+  }
+
+  #game-container { width: 100%; height: 100%; }
+  #game-container canvas { width: 100% !important; height: 100% !important; display: block; }
+
+  .controls-hint {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    justify-content: center;
+    max-width: 720px;
+    font-size: 13px;
+    color: rgba(244,236,216,0.65);
+  }
+
+  .controls-hint kbd {
+    background: var(--ink-2);
+    border: 1px solid var(--brass-dim);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-family: monospace;
+    color: var(--brass);
+    font-size: 12px;
+  }
+
+  footer { font-size: 12px; color: rgba(244,236,216,0.35); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ESCAPE THE ACADEMY</h1>
+  <p>A trapped student's run through four wings of a haunted school. Grab the key, dodge the staff, reach the portal.</p>
+</header>
+
+<div id="game-shell">
+  <div id="game-container"></div>
+</div>
+
+<div id="diag" style="width:min(960px,100%);font-family:monospace;font-size:12px;color:#9fe3b0;background:#0b0e1a;border:1px solid #2a2f4a;border-radius:8px;padding:8px 12px;white-space:pre-wrap;max-height:160px;overflow-y:auto;">Starting up…</div>
+
+<div class="controls-hint">
+  <span><kbd>&larr;</kbd> <kbd>&rarr;</kbd> or <kbd>A</kbd> <kbd>D</kbd> move</span>
+  <span><kbd>&uarr;</kbd> / <kbd>SPACE</kbd> jump</span>
+  <span><kbd>ESC</kbd> pause</span>
+  <span><kbd>M</kbd> mute</span>
+</div>
+
+<footer>MVP build &middot; Phaser 3 &middot; progress saved locally in this browser</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var W = 960, H = 540;
+  var GROUND_Y = H - 48;
+
+  var HERO_SHEET = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAAgCAYAAADaInAlAAAELUlEQVR4AeyYQZrTMAyFGy4yh2DPijUH4PtYcTcOwJoVexYcYU5S3u9axpM6iezE7rQzfHqV7MjvSY4ow3w4vf950zdwTwNw1puqgdIfymp6J9fVfM0AQFoDVwHOJHSdqd3SqKEGRxaC7pF8ics7AN0KSJUsB63aredKlRzJVeJf22vVdp3zDICLqNBB67mc6giOnK8lbq2h9Vxe4xEcOd9VvDUA3Qu4quh1bTx8/1sD8Lpeh7+aSalA7k0avYPN5nsNAOJgs4AjEs5/fpwMR/AdwEHv4ACqbQrrHb+dfcmwz0MGAGGDEY/wueb08esIyaKG1YEvJnTaRA9A39r/rgFAHOwpgLMrKP4tQhOsnBvyiBoAYq0vgLMr6N7/1gB0L2Cl+cVHpcu2FxH9UT+8PXz/WwNQfAkDXwD6xZfAgxJKtZXy9uyVNOLghZ9FxH3UAIrq1LV/zwB0LYAOHaiqQXy1+TqyaFVcpeFYZPY/qKpBtO58zwCIr24KdcBdgHK9BicI+Vw0YIE3aJ1yFB9ltZy1+Z464QQhN+v3ZDFeD1OO4k3zDgBEEAPiJMoCYYPWKUdxDwv8fMcCdCXCnkHLLvaCH12AEt6gNXly3Szw0ztAV0rsGbT0W80AGCtCJ8TB3gKMtNZTBKAGnY1OUX9D9m77n19PywAEDm4BxJuPLjwa8nE+/5eMUXRD5MO/ibfsny65g701NA8A4hQB4s1Hx05XSHqU1HIfKiI9jNVEl7bvImgegFt3N01T+Bq2OuLtR2e7j+8ZxNm3AHcAXM0fNgBREQdc4nuSrHGah8e8YvSBwnEWBXGguzAi03Tp2u4CUX4fARSTIrduuwbAhCkDIAwk6RJXXotN+hPOoQ9m2j1+GRP05h+mjT6gd6C8nv2L/mKI5Hdx2a37bB6AXJiLqJPdn40+2M/UxmDa9A7aWPafsiGwevhfGRAzMym3bs0DkAu3iq+Xtv4UfVDQDr+j0GnXBSivyUwbfQAJFw8Ud9UW/wujFhA30QZxue6aBwBaRHOwJ7jFlbvbFvSH1JBrE8dmhmhHLbdbStw1AEukI/a55Tmky5bc4xuNzqGu2ZLzW/MAoDSHZNmS62tPT0+nb9//JrCWYtBWfAZadzXE5pAgW3J9Tf2l3rkH1lI07bNiILdtrQMwIYo4IJaUFaCwq52fn59Pv399eSGiGoa8+Ch6s/7pM9YQHPfAfWjBSwcK/dY6AEkhFjDs5SdhBWjLXZkuZFQ9YRBH6ZVe/qfPP6/614a7/10DYC+AwgwS72mpMV160LEaWGhvAsQjYNrWO76nbt6baeOla7LcD7D1pt81ACV2FVP9NVTiWdlLDepCUloep80bBL37V5+p/7w96eZLd9w8ABSyBLd6eyKXEGA1iIq13Bgz3ZLvXUFJk70W3eYBaBF7PzP+BrYU/wEAAP//450mBwAAAAZJREFUAwBMNNlQf1PuBQAAAABJRU5ErkJggg==";
+
+
+  // =========================================================================
+  //  ON-PAGE DIAGNOSTICS (visible boot log + error reporting)
+  // =========================================================================
+  var diagEl = document.getElementById('diag');
+  var diagHadError = false;
+  function log(msg, isError) {
+    if (!diagEl) return;
+    if (isError) { diagHadError = true; diagEl.style.color = '#ff8a8a'; diagEl.style.borderColor = '#a34343'; }
+    diagEl.textContent += '\n' + msg;
+    diagEl.scrollTop = diagEl.scrollHeight;
+  }
+  window.onerror = function (message, source, lineno, colno, error) {
+    log('JS ERROR: ' + message + ' (line ' + lineno + ':' + colno + ')', true);
+    return false;
+  };
+  window.addEventListener('unhandledrejection', function (e) {
+    log('UNHANDLED PROMISE REJECTION: ' + (e.reason && e.reason.message ? e.reason.message : e.reason), true);
+  });
+  log('Page script running.');
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('failed to load ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function ensurePhaser() {
+    if (window.Phaser) {
+      log('Phaser already available (v' + window.Phaser.VERSION + ').');
+      return Promise.resolve();
+    }
+    log('Phaser not found yet — waiting briefly for the primary <script> tag...');
+    return new Promise(function (resolve) {
+      var tries = 0;
+      var iv = setInterval(function () {
+        tries++;
+        if (window.Phaser) {
+          clearInterval(iv);
+          log('Phaser became available (v' + window.Phaser.VERSION + ') after waiting.');
+          resolve();
+        } else if (tries > 20) {
+          clearInterval(iv);
+          log('Primary CDN (cdnjs) did not provide Phaser after ~2s — trying jsDelivr fallback...', true);
+          resolve(
+            loadScript('https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js')
+              .then(function () { log('jsDelivr fallback loaded (v' + (window.Phaser ? window.Phaser.VERSION : '?') + ').'); })
+              .catch(function (e) { log('jsDelivr fallback ALSO failed: ' + e.message, true); })
+          );
+        }
+      }, 100);
+    });
+  }
+
+  log('Waiting for Phaser engine and hero sprite...');
+
+  var heroImageEl = null;
+  function preloadHeroImage() {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      var settled = false;
+      var finish = function () { if (!settled) { settled = true; resolve(); } };
+      img.onload = function () { heroImageEl = img; log('Hero sprite image decoded OK (' + img.naturalWidth + 'x' + img.naturalHeight + ').'); finish(); };
+      img.onerror = function () { log('Hero sprite image failed to decode — will use fallback color block.', true); finish(); };
+      img.src = HERO_SHEET;
+      setTimeout(function () {
+        if (!settled) { log('Hero sprite image timed out after 3s — using fallback.', true); finish(); }
+      }, 3000);
+    });
+  }
+
+  Promise.all([ensurePhaser(), preloadHeroImage()]).then(function () {
+    try {
+      runGame();
+    } catch (e) {
+      log('FATAL ERROR during setup: ' + e.message + '\n' + (e.stack || ''), true);
+    }
+  }).catch(function (e) {
+    log('FATAL: could not load Phaser at all: ' + e.message, true);
+  });
+
+  function runGame() {
+  log('Phaser confirmed. Building game (v' + Phaser.VERSION + ')...');
+  // =========================================================================
+  //  AUDIO — synthesized SFX + tiny chiptune sequencer (no external files)
+  // =========================================================================
+  var audioCtx = null;
+  function ctx() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (e) { audioCtx = null; }
+    }
+    return audioCtx;
+  }
+
+  var save = loadSave();
+  var MUTED = !!save.muted;
+
+  function beep(freq, dur, type, gainVal) {
+    if (MUTED) return;
+    try {
+      var ac = ctx();
+      if (!ac) return;
+      if (ac.state === 'suspended') ac.resume();
+      var osc = ac.createOscillator();
+      var gain = ac.createGain();
+      osc.type = type || 'square';
+      osc.frequency.value = freq;
+      gain.gain.value = gainVal || 0.06;
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      var now = ac.currentTime;
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      osc.start(now);
+      osc.stop(now + dur);
+    } catch (e) { /* ignore */ }
+  }
+
+  var SFX = {
+    jump: function () { beep(520, 0.12, 'square', 0.05); },
+    coin: function () { beep(880, 0.09, 'square', 0.05); setTimeout(function () { beep(1180, 0.09, 'square', 0.04); }, 60); },
+    key: function () { beep(660, 0.1, 'triangle', 0.06); setTimeout(function () { beep(990, 0.15, 'triangle', 0.06); }, 90); },
+    hit: function () { beep(140, 0.2, 'sawtooth', 0.08); },
+    stomp: function () { beep(220, 0.08, 'square', 0.06); setTimeout(function () { beep(440, 0.08, 'square', 0.05); }, 50); },
+    powerup: function () { [523, 659, 784].forEach(function (f, i) { setTimeout(function () { beep(f, 0.12, 'triangle', 0.06); }, i * 70); }); },
+    unlock: function () { [440, 660, 880, 1100].forEach(function (f, i) { setTimeout(function () { beep(f, 0.14, 'triangle', 0.05); }, i * 90); }); },
+    win: function () { [523, 659, 784, 1046].forEach(function (f, i) { setTimeout(function () { beep(f, 0.18, 'triangle', 0.06); }, i * 110); }); },
+    lose: function () { [300, 220, 160].forEach(function (f, i) { setTimeout(function () { beep(f, 0.25, 'sawtooth', 0.07); }, i * 150); }); },
+    click: function () { beep(700, 0.05, 'square', 0.04); }
+  };
+
+  var musicTimer = null;
+  function stopMusic() { if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; } }
+  function playMusic(pattern, noteDur, wave, gainVal) {
+    stopMusic();
+    var i = 0;
+    function step() {
+      var note = pattern[i % pattern.length];
+      if (note) beep(note, noteDur * 0.85, wave || 'triangle', gainVal || 0.028);
+      i++;
+      musicTimer = setTimeout(step, noteDur * 1000);
+    }
+    step();
+  }
+
+  // =========================================================================
+  //  SAVE DATA
+  // =========================================================================
+  var SAVE_KEY = 'escapeAcademy_save_v2';
+  function loadSave() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (raw) {
+        var d = JSON.parse(raw);
+        if (!d.scores) d.scores = {};
+        if (!d.unlocked) d.unlocked = 1;
+        return d;
+      }
+    } catch (e) { /* ignore */ }
+    return { unlocked: 1, scores: {}, muted: false };
+  }
+  function persistSave(data) {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* ignore */ }
+  }
+
+  function toggleMute() {
+    MUTED = !MUTED;
+    var s = loadSave();
+    s.muted = MUTED;
+    persistSave(s);
+    return MUTED;
+  }
+
+  // =========================================================================
+  //  HERO SPRITE (imported from the uploaded Piskel file — 4-frame walk cycle)
+  //  (data URI defined above, decoded via a plain Image() before Phaser boots
+  //   to avoid Phaser's async loader hanging on data: URIs in some hosts)
+  // =========================================================================
+
+  // =========================================================================
+  //  LEVEL DATA
+  // =========================================================================
+  var LEVELS = [
+    {
+      id: 1, name: 'The Library', short: 'Wing I',
+      accent: 0xd9a441, bgTop: 0x232a4d, bgBottom: 0x0f1220, mat: 'wood', hazardTint: 0xffffff,
+      ground: [{ start: 0, count: 5 }, { start: 430, count: 8 }, { start: 1060, count: 12 }],
+      width: 1900,
+      platforms: [[230, 400], [520, 340], [680, 260], [300, 200], [1150, 380], [1300, 260], [1500, 340], [1650, 200]],
+      movers: [],
+      coins: [[150, 440], [230, 356], [520, 296], [680, 216], [300, 156], [900, 440], [1150, 336], [1300, 216], [1500, 296], [1650, 156], [1750, 440], [1800, 440], [1000, 440], [600, 440], [1400, 440], [480, 440]],
+      key: [680, 210], portal: [1790, GROUND_Y - 35],
+      enemies: [
+        { type: 'patrol', x: 360, y: GROUND_Y - 16, min: 260, max: 420, speed: 60 },
+        { type: 'patrol', x: 1150, y: GROUND_Y - 16, min: 1080, max: 1250, speed: 60 }
+      ],
+      powerups: [{ type: 'shield', x: 1300, y: 216 }],
+      start: [60, GROUND_Y - 60]
+    },
+    {
+      id: 2, name: 'The Science Lab', short: 'Wing II',
+      accent: 0x63e6be, bgTop: 0x14332e, bgBottom: 0x0b1a20, mat: 'metal', hazardTint: 0x7cffb0,
+      ground: [{ start: 0, count: 6 }, { start: 480, count: 6 }, { start: 960, count: 5 }, { start: 1400, count: 10 }],
+      width: 2100,
+      platforms: [[280, 380], [560, 300], [760, 220], [1020, 340], [1150, 260], [1500, 380], [1650, 260], [1800, 180], [1950, 300]],
+      movers: [{ x0: 1290, y: 340, axis: 'x', min: 1290, max: 1390, speed: 80, mat: 'metal' }, { x: 1600, y0: 200, axis: 'y', min: 200, max: 380, speed: 60, mat: 'metal' }],
+      coins: [[150, 440], [280, 336], [560, 256], [760, 176], [1020, 296], [1150, 216], [1500, 336], [1650, 216], [1800, 136], [1950, 256], [420, 440], [700, 440], [900, 440], [1250, 440], [1750, 440], [2000, 440], [2050, 440], [1050, 440]],
+      key: [1150, 210], portal: [2000, GROUND_Y - 35],
+      enemies: [
+        { type: 'patrol', x: 500, y: GROUND_Y - 16, min: 420, max: 620, speed: 65 },
+        { type: 'patrol', x: 1450, y: GROUND_Y - 16, min: 1400, max: 1600, speed: 70 },
+        { type: 'flyer', x: 700, y: 200, min: 600, max: 850, ymin: 140, ymax: 260, speed: 90 },
+        { type: 'flyer', x: 1800, y: 220, min: 1700, max: 1950, ymin: 150, ymax: 300, speed: 100 }
+      ],
+      powerups: [{ type: 'speed', x: 560, y: 260 }, { type: 'shield', x: 1500, y: 340 }, { type: 'life', x: 1950, y: 256 }],
+      start: [60, GROUND_Y - 60]
+    },
+    {
+      id: 3, name: 'The Computer Lab', short: 'Wing III',
+      accent: 0x5fc9ff, bgTop: 0x121b3a, bgBottom: 0x0a0f22, mat: 'metal2', hazardTint: 0x8fd8ff,
+      ground: [{ start: 0, count: 5 }, { start: 420, count: 5 }, { start: 840, count: 5 }, { start: 1260, count: 5 }, { start: 1680, count: 9 }],
+      width: 2340,
+      platforms: [[260, 380], [420, 300], [600, 220], [760, 340], [900, 260], [1050, 180], [1200, 320], [1350, 240], [1500, 160], [1750, 340], [1900, 240], [2050, 340], [2150, 200]],
+      movers: [{ x: 1050, y0: 200, axis: 'y', min: 200, max: 340, speed: 70, mat: 'metal2' }, { x0: 1700, y: 300, axis: 'x', min: 1700, max: 1850, speed: 90, mat: 'metal2' }],
+      coins: [[150, 440], [260, 336], [420, 256], [600, 176], [760, 296], [900, 216], [1050, 136], [1200, 276], [1350, 196], [1500, 116], [1750, 296], [1900, 196], [2050, 296], [2150, 156], [520, 440], [1130, 440], [1600, 440], [2000, 440], [2210, 440], [980, 440]],
+      key: [1050, 130], portal: [2210, GROUND_Y - 35],
+      enemies: [
+        { type: 'patrol', x: 300, y: GROUND_Y - 16, min: 260, max: 380, speed: 70 },
+        { type: 'patrol', x: 900, y: GROUND_Y - 16, min: 840, max: 1000, speed: 75 },
+        { type: 'patrol', x: 1750, y: GROUND_Y - 16, min: 1680, max: 1850, speed: 75 },
+        { type: 'flyer', x: 650, y: 200, min: 560, max: 800, ymin: 150, ymax: 260, speed: 100 },
+        { type: 'flyer', x: 1400, y: 200, min: 1330, max: 1560, ymin: 140, ymax: 260, speed: 105 },
+        { type: 'flyer', x: 2100, y: 210, min: 2000, max: 2250, ymin: 150, ymax: 280, speed: 110 }
+      ],
+      powerups: [{ type: 'shield', x: 420, y: 256 }, { type: 'speed', x: 1200, y: 276 }, { type: 'life', x: 2050, y: 296 }],
+      start: [60, GROUND_Y - 60]
+    },
+    {
+      id: 4, name: 'The Rooftop', short: 'Wing IV',
+      accent: 0xff8a5c, bgTop: 0x3a1a2e, bgBottom: 0x140b1e, mat: 'stone', hazardTint: 0xffb37c,
+      ground: [{ start: 0, count: 4 }, { start: 340, count: 4 }, { start: 680, count: 4 }, { start: 1020, count: 4 }, { start: 1360, count: 4 }, { start: 1700, count: 10 }],
+      width: 2450,
+      platforms: [[200, 380], [400, 300], [560, 220], [700, 340], [860, 260], [1000, 180], [1150, 320], [1300, 240], [1600, 300], [1800, 380], [1950, 260], [2100, 180], [2250, 300], [2350, 220]],
+      movers: [{ x0: 1270, y: 300, axis: 'x', min: 1270, max: 1370, speed: 100, mat: 'stone' }, { x: 1450, y0: 200, axis: 'y', min: 200, max: 360, speed: 80, mat: 'stone' }, { x0: 2100, y: 200, axis: 'x', min: 2100, max: 2250, speed: 110, mat: 'stone' }],
+      coins: [[150, 440], [200, 336], [400, 256], [560, 176], [700, 296], [860, 216], [1000, 136], [1150, 276], [1300, 196], [1600, 256], [1800, 336], [1950, 216], [2100, 136], [2350, 176], [280, 440], [780, 440], [1080, 440], [1430, 440], [1780, 440], [520, 440], [950, 440], [2280, 440]],
+      key: [1450, 130], portal: [2300, GROUND_Y - 35],
+      enemies: [
+        { type: 'patrol', x: 260, y: GROUND_Y - 16, min: 200, max: 340, speed: 90 },
+        { type: 'patrol', x: 860, y: GROUND_Y - 16, min: 800, max: 940, speed: 90 },
+        { type: 'patrol', x: 1450, y: GROUND_Y - 16, min: 1380, max: 1550, speed: 95 },
+        { type: 'patrol', x: 2100, y: GROUND_Y - 16, min: 2020, max: 2200, speed: 95 },
+        { type: 'flyer', x: 700, y: 200, min: 600, max: 850, ymin: 140, ymax: 260, speed: 110 },
+        { type: 'flyer', x: 1600, y: 220, min: 1500, max: 1800, ymin: 150, ymax: 280, speed: 115 },
+        { type: 'flyer', x: 2250, y: 200, min: 2150, max: 2400, ymin: 140, ymax: 260, speed: 120 }
+      ],
+      powerups: [{ type: 'shield', x: 400, y: 256 }, { type: 'speed', x: 1150, y: 276 }, { type: 'life', x: 2100, y: 136 }, { type: 'shield', x: 2350, y: 176 }],
+      start: [60, GROUND_Y - 60]
+    }
+  ];
+
+  // =========================================================================
+  //  SHARED HELPERS
+  // =========================================================================
+  function burst(scene, x, y, tint, count) {
+    var emitter = scene.add.particles(x, y, 'spark', {
+      speed: { min: 60, max: 170 }, scale: { start: 1.1, end: 0 },
+      lifespan: 420, tint: tint, blendMode: 'ADD', emitting: false
+    });
+    emitter.explode(count || 8);
+    scene.time.delayedCall(500, function () { emitter.destroy(); });
+  }
+
+  function addMuteToggle(scene) {
+    var icon = scene.add.text(W - 14, 14, MUTED ? '\uD83D\uDD07' : '\uD83D\uDD0A', { fontSize: '20px' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(100).setInteractive({ useHandCursor: true });
+    icon.on('pointerdown', function () {
+      var m = toggleMute();
+      icon.setText(m ? '\uD83D\uDD07' : '\uD83D\uDD0A');
+    });
+    scene.input.keyboard.on('keydown-M', function () {
+      var m = toggleMute();
+      icon.setText(m ? '\uD83D\uDD07' : '\uD83D\uDD0A');
+    });
+    return icon;
+  }
+
+  function fadeToScene(scene, key, data) {
+    scene.cameras.main.fadeOut(260, 15, 18, 32);
+    scene.cameras.main.once('camerafadeoutcomplete', function () {
+      scene.scene.start(key, data);
+    });
+  }
+
+  // =========================================================================
+  //  BOOT — generate all textures + animations, load hero spritesheet
+  // =========================================================================
+  function BootScene() { Phaser.Scene.call(this, { key: 'Boot' }); }
+  BootScene.prototype = Object.create(Phaser.Scene.prototype);
+  BootScene.prototype.constructor = BootScene;
+
+  BootScene.prototype.create = function () {
+    if (heroImageEl) {
+      try {
+        this.textures.addSpriteSheet('hero', heroImageEl, { frameWidth: 32, frameHeight: 32 });
+        log('Hero spritesheet registered with Phaser.');
+      } catch (e) {
+        log('Could not register hero spritesheet: ' + e.message, true);
+      }
+    } else {
+      log('No hero image available — fallback block will be used.');
+    }
+
+    var g = this.add.graphics();
+
+    function bgTexture(key, top, bottom) {
+      g.fillGradientStyle(top, top, bottom, bottom, 1);
+      g.fillRect(0, 0, W, H);
+      g.generateTexture(key, W, H);
+      g.clear();
+    }
+    LEVELS.forEach(function (lv) { bgTexture('bg' + lv.id, lv.bgTop, lv.bgBottom); });
+    bgTexture('bgMenu', 0x1b2040, 0x0f1220);
+
+    // decor silhouette (reused, tinted per level)
+    g.fillStyle(0x232a4d, 1);
+    for (var i = 0; i < 14; i++) g.fillRect(i * 130 + 10, 40, 90, 160);
+    g.fillStyle(0x2c355e, 1);
+    for (var j = 0; j < 14; j++) for (var r = 0; r < 4; r++) g.fillRect(j * 130 + 18, 50 + r * 38, 74, 6);
+    g.generateTexture('decor', 14 * 130, 210);
+    g.clear();
+
+    // ---- hero-adjacent fx: spark ----
+    g.fillStyle(0xffffff, 1); g.fillCircle(4, 4, 4);
+    g.generateTexture('spark', 8, 8);
+    g.clear();
+
+    // ---- ground material sets: wood / metal / metal2 / stone ----
+    function groundSet(prefix, top, mid, bottom, plankLine) {
+      g.fillStyle(bottom, 1); g.fillRect(0, 0, 64, 48);
+      g.fillStyle(top, 1); g.fillRect(0, 0, 64, 8);
+      g.fillStyle(plankLine, 1); g.fillRect(0, 8, 64, 2);
+      g.generateTexture(prefix + 'Ground', 64, 48);
+      g.clear();
+
+      g.fillStyle(mid, 1); g.fillRect(0, 0, 64, 24);
+      g.fillStyle(top, 1); g.fillRect(0, 0, 64, 5);
+      g.fillStyle(bottom, 1); g.fillRect(0, 20, 64, 4);
+      g.generateTexture(prefix + 'Plat', 64, 24);
+      g.clear();
+    }
+    groundSet('wood', 0x8a5a34, 0x6b4226, 0x4a2c17, 0x4a2c17);
+    groundSet('metal', 0x5c7a78, 0x3c5654, 0x233634, 0x1a2827);
+    groundSet('metal2', 0x4a6a9c, 0x314b73, 0x1d2e4d, 0x16233d);
+    groundSet('stone', 0x8a5f52, 0x6b4038, 0x422523, 0x321a19);
+
+    // rivets/detail overlay for metal sets (small dots)
+    ['metal', 'metal2'].forEach(function (p) {
+      var img = g;
+    });
+
+    // ---- coin / key / portal ----
+    g.fillStyle(0xd9a441, 1); g.fillCircle(12, 12, 12);
+    g.fillStyle(0xf4d998, 1); g.fillCircle(12, 12, 7);
+    g.generateTexture('coin', 24, 24);
+    g.clear();
+
+    g.fillStyle(0xd9a441, 1); g.fillCircle(8, 8, 7); g.fillRect(8, 5, 16, 6); g.fillRect(20, 11, 4, 5); g.fillRect(15, 11, 3, 6);
+    g.fillStyle(0x0f1220, 1); g.fillCircle(8, 8, 3);
+    g.generateTexture('key', 28, 22);
+    g.clear();
+
+    g.fillStyle(0x2f9e77, 1); g.fillRoundedRect(0, 0, 44, 70, 10);
+    g.fillStyle(0x0f1220, 1); g.fillRoundedRect(6, 6, 32, 58, 8);
+    g.fillStyle(0x7be3bd, 1); g.fillRoundedRect(12, 12, 20, 46, 6);
+    g.generateTexture('portal', 44, 70);
+    g.clear();
+
+    // ---- enemy: ground patrol (warden) ----
+    g.fillStyle(0xe2574c, 1); g.fillRoundedRect(0, 4, 32, 26, 6);
+    g.fillStyle(0x0f1220, 1); g.fillRect(6, 12, 6, 6); g.fillRect(20, 12, 6, 6);
+    g.fillStyle(0xf4ecd8, 1); g.fillRect(6, 26, 6, 4); g.fillRect(20, 26, 6, 4);
+    g.generateTexture('enemyPatrol', 32, 32);
+    g.clear();
+
+    // ---- enemy: flying proctor (bat/drone) ----
+    g.fillStyle(0x8e5cff, 1); g.fillEllipse(16, 16, 30, 18);
+    g.fillTriangle(0, 14, 8, 2, 10, 16);
+    g.fillTriangle(32, 14, 24, 2, 22, 16);
+    g.fillStyle(0xffe27a, 1); g.fillCircle(11, 15, 3); g.fillCircle(21, 15, 3);
+    g.fillStyle(0x0f1220, 1); g.fillCircle(11, 15, 1.4); g.fillCircle(21, 15, 1.4);
+    g.generateTexture('enemyFlyer', 32, 26);
+    g.clear();
+
+    // ---- hazard: spikes ----
+    g.fillStyle(0x9aa0b4, 1);
+    for (var s = 0; s < 4; s++) g.fillTriangle(s * 16, 24, s * 16 + 8, 2, s * 16 + 16, 24);
+    g.generateTexture('spikes', 64, 24);
+    g.clear();
+
+    // ---- player start/idle placeholder (fallback if sheet fails) ----
+    g.fillStyle(0x4fd1c5, 1); g.fillRect(4, 10, 24, 30);
+    g.generateTexture('heroFallback', 32, 46);
+    g.clear();
+
+    // ---- power-ups ----
+    g.fillStyle(0xff6b81, 1);
+    g.fillCircle(9, 10, 8); g.fillCircle(19, 10, 8); g.fillTriangle(2, 13, 28, 13, 14, 28);
+    g.generateTexture('puLife', 28, 28);
+    g.clear();
+
+    g.fillStyle(0x5fc9ff, 1);
+    g.fillTriangle(14, 0, 28, 8, 14, 16);
+    g.fillTriangle(14, 0, 0, 8, 14, 16);
+    g.fillTriangle(14, 12, 28, 20, 14, 28);
+    g.fillTriangle(14, 12, 0, 20, 14, 28);
+    g.generateTexture('puShield', 28, 28);
+    g.clear();
+
+    g.fillStyle(0xffd93d, 1);
+    g.fillTriangle(16, 0, 4, 16, 14, 16);
+    g.fillTriangle(14, 16, 24, 16, 10, 30);
+    g.generateTexture('puSpeed', 28, 30);
+    g.destroy();
+
+    // ---- animations ----
+    if (this.textures.exists('hero')) {
+      this.anims.create({ key: 'walk', frames: this.anims.generateFrameNumbers('hero', { start: 0, end: 3 }), frameRate: 9, repeat: -1 });
+    }
+
+    this.scene.start('Menu');
+  };
+
+  // =========================================================================
+  //  MENU
+  // =========================================================================
+  function MenuScene() { Phaser.Scene.call(this, { key: 'Menu' }); }
+  MenuScene.prototype = Object.create(Phaser.Scene.prototype);
+  MenuScene.prototype.constructor = MenuScene;
+  MenuScene.prototype.create = function () {
+    log('Menu scene reached — game is running.');
+    if (!diagHadError) {
+      setTimeout(function () { if (!diagHadError && diagEl) diagEl.style.display = 'none'; }, 2500);
+    }
+    this.cameras.main.fadeIn(300, 15, 18, 32);
+    playMusic([392, 0, 494, 0, 587, 0, 494, 392], 0.34, 'triangle');
+
+    this.add.image(W / 2, H / 2, 'bgMenu');
+    this.add.image(W / 2, 120, 'decor').setAlpha(0.5);
+
+    this.add.text(W / 2, 150, 'ESCAPE THE ACADEMY', {
+      fontFamily: '"Press Start 2P"', fontSize: '28px', color: '#d9a441'
+    }).setOrigin(0.5).setShadow(3, 3, '#000', 0, true, true);
+
+    this.add.text(W / 2, 200, 'A four-wing escape through a haunted school', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#f4ecd8'
+    }).setOrigin(0.5);
+
+    var startBtn = this.add.text(W / 2, 290, '[ PRESS SPACE TO START ]', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#4fd1c5'
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    this.tweens.add({ targets: startBtn, alpha: 0.4, duration: 650, yoyo: true, repeat: -1 });
+
+    this.add.text(W / 2, 345,
+      'Move: \u2190 \u2192 / A D    Jump: \u2191 / SPACE    Stomp enemies from above    Pause: ESC',
+      { fontFamily: 'monospace', fontSize: '12px', color: '#bbb' }
+    ).setOrigin(0.5);
+
+    var s = loadSave();
+    var scores = Object.keys(s.scores || {}).map(function (k) { return s.scores[k]; });
+    var total = scores.reduce(function (a, b) { return a + b; }, 0);
+    this.add.text(W / 2, 400, 'Total score across wings: ' + total, {
+      fontFamily: 'monospace', fontSize: '13px', color: '#a67c2e'
+    }).setOrigin(0.5);
+
+    addMuteToggle(this);
+
+    var go = function () { SFX.click(); fadeToScene(this, 'Select'); }.bind(this);
+    this.input.keyboard.once('keydown-SPACE', go);
+    startBtn.on('pointerdown', go);
+  };
+
+  // =========================================================================
+  //  LEVEL SELECT
+  // =========================================================================
+  function SelectScene() { Phaser.Scene.call(this, { key: 'Select' }); }
+  SelectScene.prototype = Object.create(Phaser.Scene.prototype);
+  SelectScene.prototype.constructor = SelectScene;
+  SelectScene.prototype.create = function () {
+    this.cameras.main.fadeIn(260, 15, 18, 32);
+    playMusic([392, 0, 494, 0, 587, 0, 494, 392], 0.34, 'triangle');
+
+    this.add.image(W / 2, H / 2, 'bgMenu');
+    this.add.text(W / 2, 46, 'CHOOSE YOUR WING', {
+      fontFamily: '"Press Start 2P"', fontSize: '20px', color: '#d9a441'
+    }).setOrigin(0.5);
+
+    var sv = loadSave();
+    var self = this;
+    var cardW = 200, cardH = 300, gap = 24;
+    var totalW = LEVELS.length * cardW + (LEVELS.length - 1) * gap;
+    var startX = W / 2 - totalW / 2 + cardW / 2;
+    this.selected = 0;
+    this.cards = [];
+
+    LEVELS.forEach(function (lv, i) {
+      var cx = startX + i * (cardW + gap);
+      var cy = H / 2 + 20;
+      var unlocked = sv.unlocked >= lv.id;
+
+      var box = self.add.rectangle(cx, cy, cardW, cardH, unlocked ? 0x171b30 : 0x14141c, 1)
+        .setStrokeStyle(3, unlocked ? lv.accent : 0x3a3a44);
+
+      var swatch = self.add.rectangle(cx, cy - cardH / 2 + 40, cardW - 30, 60, lv.accent, unlocked ? 0.85 : 0.15);
+
+      var title = self.add.text(cx, cy - 60, lv.short, {
+        fontFamily: '"Press Start 2P"', fontSize: '12px', color: unlocked ? '#f4ecd8' : '#555'
+      }).setOrigin(0.5);
+
+      var name = self.add.text(cx, cy - 30, lv.name, {
+        fontFamily: 'monospace', fontSize: '13px', color: unlocked ? '#d9a441' : '#555', wordWrap: { width: cardW - 24 }, align: 'center'
+      }).setOrigin(0.5);
+
+      var status;
+      if (!unlocked) {
+        status = self.add.text(cx, cy + 30, '\uD83D\uDD12 LOCKED', { fontFamily: 'monospace', fontSize: '13px', color: '#666' }).setOrigin(0.5);
+      } else {
+        var best = sv.scores[lv.id] || 0;
+        status = self.add.text(cx, cy + 30, 'Best: ' + best, { fontFamily: 'monospace', fontSize: '13px', color: '#4fd1c5' }).setOrigin(0.5);
+      }
+
+      var hint = self.add.text(cx, cy + cardH / 2 - 26, unlocked ? 'ENTER / CLICK' : '', {
+        fontFamily: 'monospace', fontSize: '11px', color: '#888'
+      }).setOrigin(0.5);
+
+      box.setInteractive({ useHandCursor: unlocked });
+      box.on('pointerdown', function () {
+        if (!unlocked) { SFX.hit(); return; }
+        self.selected = i;
+        self.launchLevel(lv.id);
+      });
+      box.on('pointerover', function () { if (unlocked) { self.selected = i; self.refreshHighlight(); } });
+
+      self.cards.push({ box: box, unlocked: unlocked, id: lv.id });
+    });
+
+    this.refreshHighlight = function () {
+      self.cards.forEach(function (c, i) {
+        c.box.setStrokeStyle(3, i === self.selected ? 0xffffff : (c.unlocked ? LEVELS[i].accent : 0x3a3a44));
+      });
+    };
+    this.refreshHighlight();
+
+    this.add.text(W / 2, H - 66,
+      '\u2764 extra life    \uD83D\uDD37 shield (temp. invincible)    \u26A1 speed boost    Stomp foes from above to defeat them',
+      { fontFamily: 'monospace', fontSize: '11px', color: '#999' }
+    ).setOrigin(0.5);
+
+    var backTxt = this.add.text(20, H - 26, '\u2190 back to menu', { fontFamily: 'monospace', fontSize: '12px', color: '#888' })
+      .setInteractive({ useHandCursor: true });
+    backTxt.on('pointerdown', function () { fadeToScene(self, 'Menu'); });
+
+    addMuteToggle(this);
+
+    this.launchLevel = function (id) {
+      SFX.click();
+      fadeToScene(self, 'Game', { levelId: id });
+    };
+
+    this.input.keyboard.on('keydown-LEFT', function () {
+      self.selected = Math.max(0, self.selected - 1); self.refreshHighlight(); SFX.click();
+    });
+    this.input.keyboard.on('keydown-RIGHT', function () {
+      self.selected = Math.min(LEVELS.length - 1, self.selected + 1); self.refreshHighlight(); SFX.click();
+    });
+    this.input.keyboard.on('keydown-ENTER', function () {
+      var c = self.cards[self.selected];
+      if (c.unlocked) self.launchLevel(c.id); else SFX.hit();
+    });
+    this.input.keyboard.on('keydown-SPACE', function () {
+      var c = self.cards[self.selected];
+      if (c.unlocked) self.launchLevel(c.id); else SFX.hit();
+    });
+    this.input.keyboard.once('keydown-ESC', function () { fadeToScene(self, 'Menu'); });
+  };
+
+  // =========================================================================
+  //  GAME
+  // =========================================================================
+  function GameScene() { Phaser.Scene.call(this, { key: 'Game' }); }
+  GameScene.prototype = Object.create(Phaser.Scene.prototype);
+  GameScene.prototype.constructor = GameScene;
+
+  GameScene.prototype.init = function (data) {
+    this.levelId = data.levelId || 1;
+    this.lv = LEVELS[this.levelId - 1];
+  };
+
+  GameScene.prototype.create = function () {
+    var self = this;
+    var lv = this.lv;
+
+    this.cameras.main.fadeIn(300, 15, 18, 32);
+    var musicPatterns = {
+      1: [349, 0, 415, 0, 494, 415, 349, 0],
+      2: [220, 262, 0, 294, 220, 0, 330, 294],
+      3: [196, 0, 233, 0, 262, 233, 196, 0],
+      4: [261, 293, 329, 391, 329, 293, 261, 0]
+    };
+    playMusic(musicPatterns[this.levelId] || musicPatterns[1], 0.26, this.levelId === 4 ? 'sawtooth' : 'triangle', 0.024);
+
+    this.score = 0;
+    this.lives = 3;
+    this.hasKey = false;
+    this.invincible = false;
+    this.gameEnded = false;
+    this.shieldUntil = 0;
+    this.speedUntil = 0;
+
+    this.matGround = lv.mat + 'Ground';
+    this.matPlat = lv.mat + 'Plat';
+
+    this.add.image(0, 0, 'bg' + lv.id).setOrigin(0, 0).setDisplaySize(lv.width, H).setScrollFactor(0.15);
+    this.add.tileSprite(0, 40, lv.width, 210, 'decor').setOrigin(0, 0).setAlpha(0.4).setTint(lv.accent).setScrollFactor(0.4);
+
+    this.physics.world.setBounds(0, 0, lv.width, H);
+    this.cameras.main.setBounds(0, 0, lv.width, H);
+
+    // ---- ground & pits ----
+    this.platforms = this.physics.add.staticGroup();
+    this.spikes = this.physics.add.staticGroup();
+
+    var segs = lv.ground.slice().sort(function (a, b) { return a.start - b.start; });
+    segs.forEach(function (seg) {
+      for (var i = 0; i < seg.count; i++) {
+        self.platforms.create(seg.start + i * 64 + 32, GROUND_Y + 24, self.matGround).setOrigin(0.5, 0.5).refreshBody();
+      }
+    });
+    for (var i = 0; i < segs.length - 1; i++) {
+      var gapStart = segs[i].start + segs[i].count * 64;
+      var gapEnd = segs[i + 1].start;
+      if (gapEnd > gapStart) {
+        var pw = gapEnd - gapStart;
+        var spike = this.spikes.create((gapStart + gapEnd) / 2, GROUND_Y - 12, 'spikes');
+        spike.setDisplaySize(pw, 24).refreshBody();
+        spike.setTint(lv.hazardTint);
+      }
+    }
+
+    // ---- floating platforms ----
+    lv.platforms.forEach(function (p) { self.platforms.create(p[0], p[1], self.matPlat).refreshBody(); });
+
+    // ---- moving platforms ----
+    this.movers = this.physics.add.group({ allowGravity: false, immovable: true });
+    lv.movers.forEach(function (m) {
+      var mp = self.movers.create(m.x !== undefined ? m.x : m.x0, m.y !== undefined ? m.y : m.y0, m.mat + 'Plat');
+      mp.setTint(0x66e0ff);
+      mp.axis = m.axis; mp.minV = m.min; mp.maxV = m.max; mp.speed = m.speed;
+      mp.prevX = mp.x; mp.prevY = mp.y;
+      if (m.axis === 'x') mp.body.setVelocityX(m.speed); else mp.body.setVelocityY(m.speed);
+      mp.body.setImmovable(true);
+    });
+
+    // ---- player ----
+    this.player = this.physics.add.sprite(lv.start[0], lv.start[1], this.textures.exists('hero') ? 'hero' : 'heroFallback');
+    this.player.setCollideWorldBounds(true);
+    this.player.setBounce(0.05);
+    this.player.body.setSize(20, 28).setOffset(6, 4);
+    this.player.setDepth(10);
+    this.physics.add.collider(this.player, this.platforms);
+    this.physics.add.collider(this.player, this.movers, function () { self.ridingMover = true; });
+
+    this.cameras.main.startFollow(this.player, true, 0.09, 0.09);
+    this.cameras.main.setDeadzone(120, 120);
+
+    // ---- coins ----
+    this.coins = this.physics.add.group({ allowGravity: false });
+    lv.coins.forEach(function (p) {
+      var c = self.coins.create(p[0], p[1], 'coin');
+      self.tweens.add({ targets: c, y: p[1] - 8, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    });
+
+    // ---- key ----
+    this.keyItem = this.physics.add.sprite(lv.key[0], lv.key[1], 'key');
+    this.keyItem.body.setAllowGravity(false);
+    this.tweens.add({ targets: this.keyItem, y: lv.key[1] - 10, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: this.keyItem, angle: 10, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    // ---- portal ----
+    this.portal = this.physics.add.staticSprite(lv.portal[0], lv.portal[1], 'portal');
+    this.portal.setTint(0x555555);
+
+    // ---- power-ups ----
+    this.powerups = this.physics.add.group({ allowGravity: false });
+    lv.powerups.forEach(function (p) {
+      var tex = p.type === 'life' ? 'puLife' : (p.type === 'shield' ? 'puShield' : 'puSpeed');
+      var pu = self.powerups.create(p.x, p.y, tex);
+      pu.puType = p.type;
+      self.tweens.add({ targets: pu, y: p.y - 10, duration: 650, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    });
+
+    // ---- enemies ----
+    this.enemies = this.physics.add.group({ allowGravity: false });
+    lv.enemies.forEach(function (e) {
+      var tex = e.type === 'flyer' ? 'enemyFlyer' : 'enemyPatrol';
+      var en = self.enemies.create(e.x, e.y, tex);
+      en.body.setAllowGravity(false);
+      en.enemyType = e.type;
+      en.minX = e.min; en.maxX = e.max; en.enemySpeed = e.speed;
+      en.setVelocityX(e.speed);
+      if (e.type === 'flyer') {
+        en.baseY = e.y; en.minY = e.ymin; en.maxY = e.ymax; en.bobT = Math.random() * 1000;
+      }
+    });
+
+    // ---- overlaps ----
+    this.physics.add.overlap(this.player, this.coins, this.collectCoin, null, this);
+    this.physics.add.overlap(this.player, this.keyItem, this.collectKey, null, this);
+    this.physics.add.overlap(this.player, this.portal, this.tryExit, null, this);
+    this.physics.add.overlap(this.player, this.powerups, this.collectPowerup, null, this);
+    this.physics.add.overlap(this.player, this.enemies, this.handleEnemyOverlap, null, this);
+    this.physics.add.overlap(this.player, this.spikes, this.hitHazard, null, this);
+
+    // ---- controls ----
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE,ESC');
+
+    // ---- HUD (fixed to camera) ----
+    this.hudScore = this.add.text(16, 12, 'Score: 0', { fontFamily: 'monospace', fontSize: '16px', color: '#f4ecd8' }).setScrollFactor(0).setDepth(60);
+    this.hudLives = this.add.text(16, 34, this.livesString(), { fontFamily: 'monospace', fontSize: '16px', color: '#e2574c' }).setScrollFactor(0).setDepth(60);
+    this.hudKey = this.add.text(16, 56, 'Key: \u2716', { fontFamily: 'monospace', fontSize: '16px', color: '#888' }).setScrollFactor(0).setDepth(60);
+    this.hudBuffs = this.add.text(16, 78, '', { fontFamily: 'monospace', fontSize: '13px', color: '#5fc9ff' }).setScrollFactor(0).setDepth(60);
+    this.hudLevel = this.add.text(W - 90, 12, lv.short, { fontFamily: 'monospace', fontSize: '14px', color: '#'+lv.accent.toString(16) }).setScrollFactor(0).setDepth(60);
+    this.hudMsg = this.add.text(W / 2, 70, '', {
+      fontFamily: 'monospace', fontSize: '15px', color: '#f4ecd8', backgroundColor: '#0f1220', padding: { x: 8, y: 4 }
+    }).setOrigin(0.5).setScrollFactor(0).setAlpha(0).setDepth(60);
+
+    addMuteToggle(this).setScrollFactor(0).setDepth(60);
+
+    // ---- pause overlay ----
+    this.isPaused = false;
+    this.pauseOverlay = this.add.container(0, 0).setDepth(90).setVisible(false).setScrollFactor(0);
+    var pBg = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.65);
+    var pTxt = this.add.text(W / 2, H / 2 - 30, 'PAUSED', { fontFamily: '"Press Start 2P"', fontSize: '22px', color: '#d9a441' }).setOrigin(0.5);
+    var pHint = this.add.text(W / 2, H / 2 + 10, 'ESC to resume', { fontFamily: 'monospace', fontSize: '14px', color: '#f4ecd8' }).setOrigin(0.5);
+    var pQuit = this.add.text(W / 2, H / 2 + 44, '[ quit to level select ]', { fontFamily: 'monospace', fontSize: '13px', color: '#e2574c' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    pQuit.on('pointerdown', function () { if (self.isPaused) fadeToScene(self, 'Select'); });
+    this.pauseOverlay.add([pBg, pTxt, pHint, pQuit]);
+
+    this.input.keyboard.on('keydown-ESC', function () {
+      if (self.gameEnded) return;
+      self.isPaused = !self.isPaused;
+      self.pauseOverlay.setVisible(self.isPaused);
+      self.physics.world.isPaused = self.isPaused;
+    });
+  };
+
+  GameScene.prototype.livesString = function () {
+    var hearts = '';
+    for (var i = 0; i < this.lives; i++) hearts += '\u2764 ';
+    return hearts.trim() || '\u2013';
+  };
+
+  GameScene.prototype.showMsg = function (text, color) {
+    this.hudMsg.setText(text).setColor(color || '#f4ecd8').setAlpha(1);
+    this.tweens.add({ targets: this.hudMsg, alpha: 0, delay: 900, duration: 400 });
+  };
+
+  GameScene.prototype.collectCoin = function (player, coin) {
+    var x = coin.x, y = coin.y;
+    coin.destroy();
+    this.score += 10;
+    this.hudScore.setText('Score: ' + this.score);
+    burst(this, x, y, 0xd9a441, 6);
+    SFX.coin();
+  };
+
+  GameScene.prototype.collectKey = function (player, key) {
+    var x = key.x, y = key.y;
+    key.destroy();
+    this.hasKey = true;
+    this.hudKey.setText('Key: \u2714').setColor('#4fd1c5');
+    this.portal.clearTint();
+    burst(this, x, y, 0xd9a441, 14);
+    this.showMsg('Key collected! Reach the portal.', '#4fd1c5');
+    SFX.key();
+  };
+
+  GameScene.prototype.collectPowerup = function (player, pu) {
+    var type = pu.puType, x = pu.x, y = pu.y;
+    pu.destroy();
+    SFX.powerup();
+    if (type === 'life') {
+      this.lives = Math.min(this.lives + 1, 5);
+      this.hudLives.setText(this.livesString());
+      this.showMsg('+1 Life!', '#ff6b81');
+      burst(this, x, y, 0xff6b81, 10);
+    } else if (type === 'shield') {
+      this.shieldUntil = this.time.now + 6000;
+      this.showMsg('Shield active!', '#5fc9ff');
+      burst(this, x, y, 0x5fc9ff, 10);
+    } else if (type === 'speed') {
+      this.speedUntil = this.time.now + 6000;
+      this.showMsg('Speed boost!', '#ffd93d');
+      burst(this, x, y, 0xffd93d, 10);
+    }
+  };
+
+  GameScene.prototype.tryExit = function () {
+    if (this.gameEnded) return;
+    if (this.hasKey) this.winLevel();
+    else this.showMsg('The portal is locked. Find the key!', '#e2574c');
+  };
+
+  GameScene.prototype.handleEnemyOverlap = function (player, enemy) {
+    if (this.gameEnded) return;
+    var stomping = player.body.velocity.y > 40 && (player.body.y + player.body.height * 0.6) < enemy.y;
+    if (stomping) {
+      burst(this, enemy.x, enemy.y, 0xffffff, 10);
+      enemy.destroy();
+      this.score += 20;
+      this.hudScore.setText('Score: ' + this.score);
+      player.setVelocityY(-320);
+      SFX.stomp();
+    } else {
+      this.hitHazard(player);
+    }
+  };
+
+  GameScene.prototype.hitHazard = function (player) {
+    if (this.invincible || this.gameEnded) return;
+    if (this.time.now < this.shieldUntil) return; // shielded — no damage
+
+    this.lives -= 1;
+    SFX.hit();
+    this.cameras.main.shake(150, 0.008);
+    this.hudLives.setText(this.livesString());
+
+    var self = this;
+    this.invincible = true;
+    player.setVelocity(player.body.velocity.x > 0 ? -220 : 220, -260);
+    this.tweens.add({
+      targets: player, alpha: 0.25, duration: 100, yoyo: true, repeat: 6,
+      onComplete: function () { player.setAlpha(1); self.invincible = false; }
+    });
+
+    if (this.lives <= 0) this.loseLevel();
+  };
+
+  GameScene.prototype.winLevel = function () {
+    this.gameEnded = true;
+    this.physics.pause();
+    stopMusic();
+    SFX.win();
+
+    var sv = loadSave();
+    sv.scores[this.levelId] = Math.max(sv.scores[this.levelId] || 0, this.score);
+    var unlockedNext = false;
+    if (this.levelId < LEVELS.length && sv.unlocked <= this.levelId) {
+      sv.unlocked = this.levelId + 1;
+      unlockedNext = true;
+    }
+    persistSave(sv);
+    if (unlockedNext) setTimeout(SFX.unlock, 500);
+
+    var self = this;
+    this.time.delayedCall(300, function () {
+      fadeToScene(self, 'End', { win: true, score: self.score, levelId: self.levelId, isFinal: self.levelId === LEVELS.length });
+    });
+  };
+
+  GameScene.prototype.loseLevel = function () {
+    this.gameEnded = true;
+    this.physics.pause();
+    stopMusic();
+    SFX.lose();
+    var sv = loadSave();
+    sv.scores[this.levelId] = Math.max(sv.scores[this.levelId] || 0, this.score);
+    persistSave(sv);
+    var self = this;
+    this.time.delayedCall(300, function () {
+      fadeToScene(self, 'End', { win: false, score: self.score, levelId: self.levelId });
+    });
+  };
+
+  GameScene.prototype.update = function (time, delta) {
+    if (this.isPaused || this.gameEnded) return;
+    var self = this;
+
+    // buff HUD
+    var buffTxt = [];
+    if (time < this.shieldUntil) buffTxt.push('\uD83D\uDD37 shield ' + Math.ceil((this.shieldUntil - time) / 1000) + 's');
+    if (time < this.speedUntil) buffTxt.push('\u26A1 speed ' + Math.ceil((this.speedUntil - time) / 1000) + 's');
+    this.hudBuffs.setText(buffTxt.join('   '));
+
+    var onFloor = this.player.body.blocked.down || this.player.body.touching.down;
+    var speedBoost = time < this.speedUntil;
+    var moveSpeed = speedBoost ? 320 : 220;
+    var jumpVel = speedBoost ? -520 : -460;
+
+    var left = this.cursors.left.isDown || this.keys.A.isDown;
+    var right = this.cursors.right.isDown || this.keys.D.isDown;
+
+    if (left) { this.player.setVelocityX(-moveSpeed); this.player.setFlipX(true); }
+    else if (right) { this.player.setVelocityX(moveSpeed); this.player.setFlipX(false); }
+    else { this.player.setVelocityX(0); }
+
+    if (!onFloor) { this.player.anims.stop(); this.player.setFrame(this.textures.exists('hero') ? 2 : 0); }
+    else if (left || right) { if (this.textures.exists('hero')) this.player.anims.play('walk', true); }
+    else { this.player.anims.stop(); this.player.setFrame(0); }
+
+    if (time < this.shieldUntil) this.player.setTint(0x8fe3ff); else this.player.clearTint();
+
+    var jumpPressed = this.cursors.up.isDown || this.keys.W.isDown || this.keys.SPACE.isDown;
+    if (jumpPressed && onFloor) { this.player.setVelocityY(jumpVel); SFX.jump(); }
+
+    if (this.player.y > H + 60) {
+      this.player.setPosition(this.lv.start[0], this.lv.start[1]);
+      this.player.setVelocity(0, 0);
+      this.hitHazard(this.player);
+    }
+
+    // ground enemy patrol
+    this.enemies.children.iterate(function (e) {
+      if (!e || !e.active) return;
+      if (e.enemyType === 'patrol') {
+        if (e.x <= e.minX) e.setVelocityX(Math.abs(e.enemySpeed));
+        if (e.x >= e.maxX) e.setVelocityX(-Math.abs(e.enemySpeed));
+      } else if (e.enemyType === 'flyer') {
+        if (e.x <= e.minX) e.setVelocityX(Math.abs(e.enemySpeed));
+        if (e.x >= e.maxX) e.setVelocityX(-Math.abs(e.enemySpeed));
+        e.bobT += delta;
+        e.y = e.baseY + Math.sin(e.bobT / 260) * ((e.maxY - e.minY) / 2);
+      }
+    });
+
+    // moving platforms — carry the player along
+    var playerOnMover = false;
+    this.movers.children.iterate(function (m) {
+      if (!m || !m.active) return;
+      if (m.axis === 'x') {
+        if (m.x <= m.minV) m.body.setVelocityX(Math.abs(m.speed));
+        if (m.x >= m.maxV) m.body.setVelocityX(-Math.abs(m.speed));
+      } else {
+        if (m.y <= m.minV) m.body.setVelocityY(Math.abs(m.speed));
+        if (m.y >= m.maxV) m.body.setVelocityY(-Math.abs(m.speed));
+      }
+      var dx = m.x - m.prevX, dy = m.y - m.prevY;
+      var standingOn = self.player.body.touching.down &&
+        Math.abs((self.player.body.bottom) - (m.body.top)) < 6 &&
+        self.player.x > m.x - m.width / 2 - 6 && self.player.x < m.x + m.width / 2 + 6;
+      if (standingOn) {
+        self.player.x += dx;
+        self.player.y += dy;
+        playerOnMover = true;
+      }
+      m.prevX = m.x; m.prevY = m.y;
+    });
+  };
+
+  // =========================================================================
+  //  END SCREEN
+  // =========================================================================
+  function EndScene() { Phaser.Scene.call(this, { key: 'End' }); }
+  EndScene.prototype = Object.create(Phaser.Scene.prototype);
+  EndScene.prototype.constructor = EndScene;
+  EndScene.prototype.create = function (data) {
+    this.cameras.main.fadeIn(280, 15, 18, 32);
+    var win = !!data.win;
+    var sv = loadSave();
+    var lv = LEVELS[data.levelId - 1];
+
+    this.add.image(W / 2, H / 2, 'bg' + lv.id);
+
+    if (win && data.isFinal) {
+      playMusic([523, 659, 784, 1046, 784, 659], 0.3, 'triangle');
+      this.add.text(W / 2, 150, 'YOU ESCAPED!', { fontFamily: '"Press Start 2P"', fontSize: '26px', color: '#4fd1c5' }).setOrigin(0.5);
+      var scores = Object.keys(sv.scores).map(function (k) { return sv.scores[k]; });
+      var total = scores.reduce(function (a, b) { return a + b; }, 0);
+      this.add.text(W / 2, 200, 'All four wings cleared \u2014 total score: ' + total, { fontFamily: 'monospace', fontSize: '15px', color: '#f4ecd8' }).setOrigin(0.5);
+    } else {
+      this.add.text(W / 2, 150, win ? 'WING CLEARED' : 'GAME OVER', {
+        fontFamily: '"Press Start 2P"', fontSize: '24px', color: win ? '#4fd1c5' : '#e2574c'
+      }).setOrigin(0.5);
+      this.add.text(W / 2, 195, lv.name, { fontFamily: 'monospace', fontSize: '14px', color: '#'+lv.accent.toString(16) }).setOrigin(0.5);
+    }
+
+    this.add.text(W / 2, 240, 'Score: ' + data.score, { fontFamily: 'monospace', fontSize: '16px', color: '#f4ecd8' }).setOrigin(0.5);
+    this.add.text(W / 2, 265, 'Best on this wing: ' + (sv.scores[data.levelId] || 0), { fontFamily: 'monospace', fontSize: '13px', color: '#a67c2e' }).setOrigin(0.5);
+
+    var y = 320;
+    var self = this;
+    var options = [];
+
+    if (win && !data.isFinal && sv.unlocked > data.levelId) {
+      options.push({ label: '[ SPACE: Next Wing ]', color: '#4fd1c5', action: function () { fadeToScene(self, 'Game', { levelId: data.levelId + 1 }); } });
+    } else if (!win) {
+      options.push({ label: '[ SPACE: Retry ]', color: '#d9a441', action: function () { fadeToScene(self, 'Game', { levelId: data.levelId }); } });
+    }
+    options.push({ label: 'Level Select', color: '#888', action: function () { fadeToScene(self, 'Select'); } });
+    if (win) options.push({ label: 'Replay Wing', color: '#888', action: function () { fadeToScene(self, 'Game', { levelId: data.levelId }); } });
+
+    options.forEach(function (opt, i) {
+      var t = self.add.text(W / 2, y + i * 34, opt.label, { fontFamily: 'monospace', fontSize: '15px', color: opt.color }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      t.on('pointerdown', function () { SFX.click(); opt.action(); });
+      if (i === 0) self.tweens.add({ targets: t, alpha: 0.4, duration: 650, yoyo: true, repeat: -1 });
+    });
+
+    this.input.keyboard.once('keydown-SPACE', function () { SFX.click(); options[0].action(); });
+    addMuteToggle(this);
+  };
+
+  // =========================================================================
+  //  BOOTSTRAP
+  // =========================================================================
+  var config = {
+    type: Phaser.AUTO,
+    width: W,
+    height: H,
+    parent: 'game-container',
+    backgroundColor: '#0f1220',
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    physics: { default: 'arcade', arcade: { gravity: { y: 900 }, debug: false } },
+    scene: [BootScene, MenuScene, SelectScene, GameScene, EndScene]
+  };
+
+  new Phaser.Game(config);
+  log('Phaser.Game() constructed — booting scenes.');
+  } // end runGame
+})();
+</script>
+</body>
+</html>
