@@ -64,6 +64,13 @@
     background: var(--ink-2);
     touch-action: none;
   }
+  /* When #game-shell is the fullscreen element, let it fill the whole screen
+     instead of staying capped at 960px / a fixed aspect-ratio box. Phaser's
+     own Scale.FIT mode then letterboxes the 960x540 game within that. */
+  #game-shell:fullscreen, #game-shell:-webkit-full-screen {
+    width: 100vw; height: 100vh; max-width: none; aspect-ratio: auto;
+    border-radius: 0; box-shadow: none;
+  }
 
   #game-container { width: 100%; height: 100%; touch-action: none; }
   #game-container canvas { width: 100% !important; height: 100% !important; display: block; touch-action: none; }
@@ -102,7 +109,7 @@
   .tc-left { left: 3%; bottom: 8%; }
   .tc-right { left: 20%; bottom: 8%; }
   .tc-jump { right: 3%; bottom: 8%; max-width: 92px; width: 18%; }
-  .tc-pause { right: 3%; top: 6%; width: 10%; max-width: 44px; font-size: 14px; background: rgba(15,18,32,0.5); }
+  .tc-pause { right: 3%; top: 18%; width: 10%; max-width: 44px; font-size: 14px; background: rgba(15,18,32,0.5); }
 
   .controls-hint {
     display: flex;
@@ -135,7 +142,6 @@
 
 <header>
   <h1>ESCAPE THE ACADEMY</h1>
-  <h1>By: Theisen Reddy</h1>
   <p>A trapped student's run through four wings of a haunted school. Grab the key, dodge the staff, reach the portal.</p>
 </header>
 
@@ -438,127 +444,160 @@
   //    - max flat jump DISTANCE   ~= 225px   (same-height gap, full-speed run)
   //    - a "safe" staircase step used throughout: an 82-94px rise, spaced
   //      140px apart horizontally (comfortably under the ~163-175px that's
-  //      still reachable at that rise — see the max_horizontal_for_rise
-  //      check used when these levels were designed).
+  //      still reachable at that rise), for every staircase and bonus cluster.
   //
-  //  Every level's ground-and-pits path to the portal is walkable/jumpable
-  //  on its own — only the KEY requires climbing a short staircase built
-  //  from the safe steps above, so every level is guaranteed completable.
-  //  Moving platforms are always bonus/optional routes to extra coins or
-  //  power-ups, never required to finish.
+  //  Every platform, moving-platform end, key, power-up and portal in every
+  //  level below was run through a reachability check (BFS from the ground,
+  //  hopping only via jumps that fit the safe budget above, with riding a
+  //  moving platform counting as a valid hop between its two ends) before
+  //  being written here — nothing is placed out of reach. Moving platforms
+  //  are always a bonus/optional route to extra coins or power-ups; the
+  //  ground-and-pits path to the portal never requires them, and only the
+  //  KEY requires climbing a staircase — except each level's unique EXIT
+  //  (see below), which is deliberately part of the challenge and is still
+  //  always reachable by the safe-jump rules above.
   //
-  //  DIFFICULTY CURVE across the 4 wings:
-  //    length:     1524 -> 2133 -> 2805 -> 3182 px
-  //    pit widths:   90 -> 100-110 -> 115-122 -> 125-138 px   (still <225, but
-  //                  tighter timing is needed as the game goes on)
-  //    staircases:  2-step only -> 3-step -> 3-step + bonus -> 3-step + two bonuses
-  //    enemies:    2 patrol -> 2+2 -> 3+3 -> 4+4 (patrol+flyer), rising speeds
-  //    movers:      none -> 1 -> 2 -> 3 (always optional side-routes)
+  //  DIFFICULTY CURVE across the 4 wings (all longer than before):
+  //    length:      1731 -> 2880 -> 3620 -> 4524 px
+  //    pit widths:    95 -> 95-110 -> 105-120 -> 115-130 px   (still <225, but
+  //                   tighter timing is needed as the game goes on)
+  //    staircases:   2-step + 1 bonus step -> 3-step + bonus 2-step -> 3-step
+  //                  + two bonus clusters -> 3-step + three bonus clusters
+  //    enemies:     2 patrol -> 2+2 -> 3+3 -> 4+4 (patrol+flyer), rising speeds
+  //    movers:       none -> 1 -> 2 -> 3 (always optional side-routes)
+  //    EXIT:        Wing I   - a short ledge, one easy step up from the ground
+  //                 Wing II  - right after the level's final pit crossing
+  //                 Wing III - atop a 2-step climb at the very end
+  //                 Wing IV  - the "Freedom Gate": a 3-step staircase on the
+  //                            FAR side of one last running jump past the
+  //                            last solid ground — the level's signature finale
   // =========================================================================
   var LEVELS = [
     {
       id: 1, name: 'The Library', short: 'Wing I',
       accent: 0xd9a441, bgTop: 0x232a4d, bgBottom: 0x0f1220, mat: 'wood', hazardTint: 0xffffff,
-      ground: [{ start: 0, count: 6 }, { start: 474, count: 15 }],
-      width: 1524,
-      // Single 2-step staircase to the key, plus one bonus 3rd step for a shield.
+      ground: [{ start: 0, count: 7 }, { start: 543, count: 9 }, { start: 1214, count: 8 }],
+      width: 1731,
+      // 2-step key staircase, one bonus 3rd step, and a single step up to the exit ledge.
       platforms: [[650, 410], [790, 328], [930, 246]],
       movers: [],
       coins: [
-        [150, 456], [300, 456], [560, 456], [650, 376], [790, 294], [930, 212],
-        [1050, 456], [1150, 456], [1250, 456], [1350, 456]
+        [60, 456], [230, 456], [603, 456], [773, 456], [943, 456], [1113, 456], [1283, 456], [1453, 456], [1623, 456],
+        [650, 376], [790, 294], [930, 212]
       ],
-      key: [790, 300], portal: [1389, GROUND_Y - 35],
+      key: [790, 300], portal: [1698, 457],
       enemies: [
         { type: 'patrol', x: 250, y: GROUND_Y - 16, min: 150, max: 350, speed: 60 },
-        { type: 'patrol', x: 1050, y: GROUND_Y - 16, min: 1000, max: 1200, speed: 60 }
+        { type: 'patrol', x: 1150, y: GROUND_Y - 16, min: 1050, max: 1250, speed: 60 },
+        { type: 'patrol', x: 760, y: GROUND_Y - 16, min: 650, max: 850, speed: 65 },
+        { type: 'flyer', x: 1400, y: 190, min: 1250, max: 1600, ymin: 150, ymax: 260, speed: 85 }
       ],
-      powerups: [{ type: 'shield', x: 930, y: 220 }],
+      powerups: [{ type: 'shield', x: 930, y: 205 }],
       start: [60, GROUND_Y - 60]
     },
     {
       id: 2, name: 'The Science Lab', short: 'Wing II',
       accent: 0x63e6be, bgTop: 0x14332e, bgBottom: 0x0b1a20, mat: 'metal', hazardTint: 0x7cffb0,
-      ground: [{ start: 0, count: 6 }, { start: 484, count: 6 }, { start: 973, count: 5 }, { start: 1403, count: 10 }],
-      width: 2133,
-      // 3-step key staircase, a bonus 2-step cluster, and one bonus moving platform.
-      platforms: [[560, 410], [700, 328], [840, 246], [1050, 410], [1190, 328]],
-      movers: [{ x0: 1650, y: 280, axis: 'x', min: 1650, max: 1780, speed: 80, mat: 'metal' }],
+      ground: [{ start: 0, count: 7 }, { start: 543, count: 7 }, { start: 1091, count: 6 }, { start: 1580, count: 6 }, { start: 2074, count: 12 }],
+      width: 2880,
+      // 3-step key staircase, a bonus 2-step cluster, and a floating 3-platform "bridge" traverse near the end.
+      platforms: [[620, 410], [760, 328], [900, 246], [1160, 410], [1300, 328], [1900, 410], [2040, 410], [2180, 410]],
+      movers: [{ x0: 1650, y: 300, axis: 'x', min: 1650, max: 1780, speed: 80, mat: 'metal' }],
       coins: [
-        [150, 456], [350, 456], [560, 376], [700, 294], [840, 212], [1050, 376], [1190, 294],
-        [1330, 456], [1450, 456], [1550, 456], [1700, 240], [1750, 240], [1900, 456], [2000, 456], [2050, 456]
+        [60, 456], [230, 456], [603, 456], [773, 456], [1151, 456], [1321, 456], [1640, 456], [1810, 456],
+        [2134, 456], [2304, 456], [2474, 456], [2644, 456],
+        [620, 376], [760, 294], [900, 212], [1160, 376], [1300, 294], [1900, 376], [2040, 376], [2180, 376]
       ],
-      key: [840, 220], portal: [1998, GROUND_Y - 35],
+      key: [900, 220], portal: [2820, 457],
       enemies: [
         { type: 'patrol', x: 300, y: GROUND_Y - 16, min: 150, max: 450, speed: 65 },
-        { type: 'patrol', x: 1000, y: GROUND_Y - 16, min: 973, max: 1150, speed: 70 },
-        { type: 'flyer', x: 700, y: 190, min: 600, max: 830, ymin: 140, ymax: 240, speed: 90 },
-        { type: 'flyer', x: 1750, y: 220, min: 1650, max: 1900, ymin: 160, ymax: 300, speed: 100 }
+        { type: 'patrol', x: 1700, y: GROUND_Y - 16, min: 1600, max: 1850, speed: 70 },
+        { type: 'flyer', x: 750, y: 190, min: 650, max: 900, ymin: 150, ymax: 250, speed: 90 },
+        { type: 'flyer', x: 2050, y: 220, min: 1850, max: 2220, ymin: 150, ymax: 280, speed: 100 },
+        { type: 'patrol', x: 2350, y: GROUND_Y - 16, min: 2250, max: 2500, speed: 75 },
+        { type: 'flyer', x: 2600, y: 200, min: 2400, max: 2750, ymin: 150, ymax: 270, speed: 105 }
       ],
-      powerups: [{ type: 'speed', x: 300, y: 462 }, { type: 'shield', x: 1190, y: 300 }, { type: 'life', x: 1780, y: 220 }],
+      powerups: [{ type: 'speed', x: 700, y: 462 }, { type: 'shield', x: 1300, y: 300 }, { type: 'life', x: 2400, y: 375 }],
       start: [60, GROUND_Y - 60]
     },
     {
       id: 3, name: 'The Computer Lab', short: 'Wing III',
       accent: 0x5fc9ff, bgTop: 0x121b3a, bgBottom: 0x0a0f22, mat: 'metal2', hazardTint: 0x8fd8ff,
-      ground: [{ start: 0, count: 5 }, { start: 435, count: 5 }, { start: 873, count: 5 }, { start: 1313, count: 5 }, { start: 1755, count: 15 }],
-      width: 2805,
-      // 3-step key staircase mid-level, a bonus 3-step staircase further along, two bonus movers.
-      platforms: [[950, 410], [1090, 328], [1230, 246], [2200, 410], [2340, 328], [2480, 246]],
+      ground: [{ start: 0, count: 6 }, { start: 489, count: 6 }, { start: 983, count: 6 }, { start: 1482, count: 6 }, { start: 1984, count: 6 }, { start: 2488, count: 17 }],
+      width: 3620,
+      // Bonus 2-step near the start, 3-step key staircase, a zigzag cluster, then the final 2-step climb to the exit.
+      platforms: [
+        [600, 410], [740, 328],
+        [1060, 410], [1200, 328], [1340, 246],
+        [2600, 410], [2740, 328], [2880, 410],
+        [3280, 410], [3420, 328]
+      ],
       movers: [
-        { x0: 550, y: 380, axis: 'x', min: 550, max: 680, speed: 90, mat: 'metal2' },
-        { x: 1600, y0: 280, axis: 'y', min: 280, max: 420, speed: 80, mat: 'metal2' }
+        { x0: 820, y: 380, axis: 'x', min: 820, max: 950, speed: 90, mat: 'metal2' },
+        { x: 2150, y0: 280, axis: 'y', min: 280, max: 420, speed: 80, mat: 'metal2' }
       ],
       coins: [
-        [150, 456], [300, 456], [950, 376], [1090, 294], [1230, 212],
-        [1400, 456], [1500, 456], [1600, 260], [1650, 456], [2200, 376], [2340, 294], [2480, 212],
-        [2600, 456], [2680, 456]
+        [60, 456], [230, 456], [549, 456], [719, 456], [1043, 456], [1213, 456], [1542, 456], [1712, 456],
+        [2044, 456], [2214, 456], [2548, 456], [2718, 456], [2888, 456], [3058, 456], [3228, 456], [3398, 456],
+        [600, 376], [740, 294], [1060, 376], [1200, 294], [1340, 212], [2600, 376], [2740, 294], [2880, 376],
+        [3280, 376], [3420, 294]
       ],
-      key: [1230, 220], portal: [2670, GROUND_Y - 35],
+      key: [1340, 220], portal: [3554, 457],
       enemies: [
-        { type: 'patrol', x: 200, y: GROUND_Y - 16, min: 150, max: 320, speed: 75 },
-        { type: 'patrol', x: 1450, y: GROUND_Y - 16, min: 1400, max: 1600, speed: 80 },
-        { type: 'patrol', x: 2150, y: GROUND_Y - 16, min: 2100, max: 2280, speed: 85 },
-        { type: 'flyer', x: 500, y: 200, min: 400, max: 700, ymin: 150, ymax: 260, speed: 105 },
-        { type: 'flyer', x: 1100, y: 190, min: 1000, max: 1280, ymin: 140, ymax: 250, speed: 110 },
-        { type: 'flyer', x: 2450, y: 210, min: 2350, max: 2620, ymin: 150, ymax: 280, speed: 115 }
+        { type: 'patrol', x: 250, y: GROUND_Y - 16, min: 150, max: 400, speed: 75 },
+        { type: 'patrol', x: 1700, y: GROUND_Y - 16, min: 1550, max: 1800, speed: 80 },
+        { type: 'patrol', x: 3050, y: GROUND_Y - 16, min: 2950, max: 3150, speed: 85 },
+        { type: 'flyer', x: 650, y: 200, min: 500, max: 800, ymin: 150, ymax: 260, speed: 105 },
+        { type: 'flyer', x: 1150, y: 190, min: 950, max: 1400, ymin: 140, ymax: 260, speed: 110 },
+        { type: 'flyer', x: 3000, y: 210, min: 2550, max: 3450, ymin: 150, ymax: 280, speed: 115 },
+        { type: 'patrol', x: 3300, y: GROUND_Y - 16, min: 3200, max: 3450, speed: 90 },
+        { type: 'flyer', x: 3500, y: 190, min: 3300, max: 3570, ymin: 140, ymax: 260, speed: 120 }
       ],
-      powerups: [{ type: 'shield', x: 300, y: 462 }, { type: 'life', x: 1600, y: 240 }, { type: 'speed', x: 2480, y: 220 }],
+      powerups: [{ type: 'shield', x: 740, y: 300 }, { type: 'life', x: 2740, y: 300 }, { type: 'speed', x: 3320, y: 300 }, { type: 'shield', x: 2150, y: 255 }],
       start: [60, GROUND_Y - 60]
     },
     {
       id: 4, name: 'The Rooftop', short: 'Wing IV',
       accent: 0xff8a5c, bgTop: 0x3a1a2e, bgBottom: 0x140b1e, mat: 'stone', hazardTint: 0xffb37c,
       ground: [
-        { start: 0, count: 4 }, { start: 381, count: 4 }, { start: 765, count: 4 }, { start: 1151, count: 4 },
-        { start: 1539, count: 4 }, { start: 1930, count: 4 }, { start: 2324, count: 12 }
+        { start: 0, count: 5 }, { start: 435, count: 5 }, { start: 873, count: 5 }, { start: 1313, count: 5 },
+        { start: 1755, count: 5 }, { start: 2200, count: 5 }, { start: 2648, count: 5 }, { start: 3098, count: 22 }
       ],
-      width: 3182,
-      // Bonus 2-step near the start, 3-step key staircase mid-level (spans a pit),
-      // and a bonus 3-step staircase in the long final stretch before the portal.
-      platforms: [[460, 410], [600, 328], [1450, 410], [1590, 328], [1730, 246], [2700, 410], [2840, 328], [2980, 246]],
+      width: 4524,
+      // Bonus 2-step near the start, 3-step key staircase, two more bonus clusters, then
+      // the Freedom Gate: a 3-step staircase reached by one final running jump past the last ground.
+      platforms: [
+        [500, 410], [640, 328],
+        [1450, 410], [1590, 328], [1730, 246],
+        [2350, 410], [2490, 328], [2630, 246],
+        [3300, 410], [3440, 328], [3580, 246]
+      ],
       movers: [
         { x0: 850, y: 340, axis: 'x', min: 850, max: 970, speed: 100, mat: 'stone' },
-        { x: 2150, y0: 240, axis: 'y', min: 240, max: 380, speed: 90, mat: 'stone' },
-        { x0: 2450, y: 260, axis: 'x', min: 2450, max: 2580, speed: 120, mat: 'stone' }
+        { x: 2000, y0: 240, axis: 'y', min: 240, max: 400, speed: 90, mat: 'stone' },
+        { x0: 3620, y: 380, axis: 'x', min: 3620, max: 3750, speed: 120, mat: 'stone' }
       ],
       coins: [
-        [150, 456], [460, 376], [600, 294], [720, 456], [820, 456], [1000, 456], [1250, 456],
-        [1450, 376], [1590, 294], [1730, 212], [1850, 456], [1990, 456], [2150, 260], [2250, 456],
-        [2700, 376], [2840, 294], [2980, 212], [3100, 456]
+        [60, 456], [230, 456], [495, 456], [665, 456], [933, 456], [1103, 456], [1373, 456], [1543, 456],
+        [1815, 456], [1985, 456], [2260, 456], [2430, 456], [2708, 456], [2878, 456], [3158, 456], [3328, 456],
+        [3498, 456], [3668, 456], [3838, 456],
+        [500, 376], [640, 294], [1450, 376], [1590, 294], [1730, 212], [2350, 376], [2490, 294], [2630, 212],
+        [3300, 376], [3440, 294], [3580, 212], [4124, 376], [4264, 294]
       ],
-      key: [1730, 220], portal: [3047, GROUND_Y - 35],
+      key: [1730, 220], portal: [4478, 457],
       enemies: [
-        { type: 'patrol', x: 200, y: GROUND_Y - 16, min: 150, max: 320, speed: 95 },
-        { type: 'patrol', x: 900, y: GROUND_Y - 16, min: 850, max: 1000, speed: 100 },
-        { type: 'patrol', x: 1750, y: GROUND_Y - 16, min: 1700, max: 1900, speed: 105 },
-        { type: 'patrol', x: 2550, y: GROUND_Y - 16, min: 2450, max: 2650, speed: 110 },
-        { type: 'flyer', x: 550, y: 190, min: 450, max: 780, ymin: 140, ymax: 260, speed: 115 },
-        { type: 'flyer', x: 1300, y: 200, min: 1200, max: 1550, ymin: 150, ymax: 270, speed: 120 },
-        { type: 'flyer', x: 2050, y: 190, min: 1950, max: 2250, ymin: 140, ymax: 260, speed: 125 },
-        { type: 'flyer', x: 2850, y: 220, min: 2750, max: 3050, ymin: 150, ymax: 280, speed: 130 }
+        { type: 'patrol', x: 250, y: GROUND_Y - 16, min: 150, max: 350, speed: 95 },
+        { type: 'patrol', x: 1000, y: GROUND_Y - 16, min: 900, max: 1100, speed: 100 },
+        { type: 'patrol', x: 1875, y: GROUND_Y - 16, min: 1800, max: 1950, speed: 105 },
+        { type: 'patrol', x: 2800, y: GROUND_Y - 16, min: 2700, max: 2900, speed: 110 },
+        { type: 'flyer', x: 575, y: 190, min: 400, max: 750, ymin: 140, ymax: 260, speed: 115 },
+        { type: 'flyer', x: 1575, y: 200, min: 1350, max: 1800, ymin: 150, ymax: 270, speed: 120 },
+        { type: 'flyer', x: 2125, y: 190, min: 1950, max: 2300, ymin: 140, ymax: 260, speed: 125 },
+        { type: 'flyer', x: 3850, y: 220, min: 3250, max: 4450, ymin: 150, ymax: 280, speed: 130 },
+        { type: 'patrol', x: 3250, y: GROUND_Y - 16, min: 3150, max: 3400, speed: 115 },
+        { type: 'patrol', x: 3900, y: GROUND_Y - 16, min: 3750, max: 4050, speed: 120 }
       ],
-      powerups: [{ type: 'shield', x: 600, y: 260 }, { type: 'speed', x: 1730, y: 178 }, { type: 'shield', x: 2150, y: 200 }, { type: 'life', x: 2980, y: 220 }],
+      powerups: [{ type: 'shield', x: 640, y: 300 }, { type: 'shield', x: 2630, y: 220 }, { type: 'life', x: 3580, y: 220 }, { type: 'shield', x: 2000, y: 225 }],
       start: [60, GROUND_Y - 60]
     }
   ];
@@ -594,11 +633,23 @@
 
   // Adds the speaker icon (top-right) every scene shows, wired to both click and "M".
   function addMuteToggle(scene) {
-    var icon = scene.add.text(W - 14, 14, MUTED ? '\uD83D\uDD07' : '\uD83D\uDD0A', { fontSize: '20px' })
+    var icon = scene.add.text(W - 14, 12, MUTED ? '\uD83D\uDD07' : '\uD83D\uDD0A', { fontSize: '20px' })
       .setOrigin(1, 0).setScrollFactor(0).setDepth(100).setInteractive({ useHandCursor: true });
     var refresh = function () { icon.setText(toggleMute() ? '\uD83D\uDD07' : '\uD83D\uDD0A'); };
     icon.on('pointerdown', refresh);
     scene.input.keyboard.on('keydown-M', refresh);
+    return icon;
+  }
+
+  // Adds the fullscreen icon (left of the speaker icon), wired to click and "F".
+  // Silently does nothing if the browser doesn't support the Fullscreen API.
+  function addFullscreenToggle(scene) {
+    if (!scene.scale.fullscreen.available) return null;
+    var icon = scene.add.text(W - 48, 12, '\u26F6', { fontSize: '20px' })
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(100).setInteractive({ useHandCursor: true });
+    var toggle = function () { scene.scale.toggleFullscreen(); };
+    icon.on('pointerdown', toggle);
+    scene.input.keyboard.on('keydown-F', toggle);
     return icon;
   }
 
@@ -828,6 +879,7 @@
     }).setOrigin(0.5);
 
     addMuteToggle(this);
+    addFullscreenToggle(this);
 
     var go = function () { SFX.click(); fadeToScene(this, 'Select'); }.bind(this);
     this.input.keyboard.once('keydown-SPACE', go);
@@ -905,6 +957,7 @@
     backTxt.on('pointerdown', function () { fadeToScene(self, 'Menu'); });
 
     addMuteToggle(this);
+    addFullscreenToggle(this);
 
     this.launchLevel = function (id) { SFX.click(); fadeToScene(self, 'Game', { levelId: id }); };
 
@@ -932,6 +985,10 @@
   GameScene.prototype.init = function (data) {
     this.levelId = data.levelId || 1;
     this.lv = LEVELS[this.levelId - 1];
+    // Lives carry over from the previous wing when data.lives is passed (see
+    // winLevel() below); a fresh 3 lives otherwise — e.g. picked from Level
+    // Select, retried after a loss, or replayed on purpose.
+    this.startingLives = (typeof data.lives === 'number') ? data.lives : 3;
   };
 
   GameScene.prototype.create = function () {
@@ -952,7 +1009,7 @@
 
     // ---- per-run state ----
     this.score = 0;
-    this.lives = 3;
+    this.lives = this.startingLives;
     this.hasKey = false;
     this.invincible = false;
     this.gameEnded = false;
@@ -983,9 +1040,14 @@
       var gapStart = segs[i].start + segs[i].count * 64;
       var gapEnd = segs[i + 1].start;
       if (gapEnd > gapStart) {
-        var spike = this.spikes.create((gapStart + gapEnd) / 2, GROUND_Y - 12, 'spikes');
-        spike.setDisplaySize(gapEnd - gapStart, 24).refreshBody();
-        spike.setTint(lv.hazardTint);
+        // Alternate between true pits and spike pits so each wing has a near-even
+        // mix of the two hazard types. Even-indexed gaps are empty pits; odd-indexed
+        // gaps are filled with spikes.
+        if (i % 2 === 1) {
+          var spike = this.spikes.create((gapStart + gapEnd) / 2, GROUND_Y - 12, 'spikes');
+          spike.setDisplaySize(gapEnd - gapStart, 24).refreshBody();
+          spike.setTint(lv.hazardTint);
+        }
       }
     }
 
@@ -1066,12 +1128,13 @@
     this.hudLives = this.add.text(16, 34, this.livesString(), { fontFamily: 'monospace', fontSize: '16px', color: '#e2574c' }).setScrollFactor(0).setDepth(60);
     this.hudKey = this.add.text(16, 56, 'Key: \u2716', { fontFamily: 'monospace', fontSize: '16px', color: '#888' }).setScrollFactor(0).setDepth(60);
     this.hudBuffs = this.add.text(16, 78, '', { fontFamily: 'monospace', fontSize: '13px', color: '#5fc9ff' }).setScrollFactor(0).setDepth(60);
-    this.hudLevel = this.add.text(W - 90, 12, lv.short, { fontFamily: 'monospace', fontSize: '14px', color: hex(lv.accent) }).setScrollFactor(0).setDepth(60);
+    this.hudLevel = this.add.text(W - 132, 12, lv.short, { fontFamily: 'monospace', fontSize: '14px', color: hex(lv.accent) }).setScrollFactor(0).setDepth(60);
     this.hudMsg = this.add.text(W / 2, 70, '', {
       fontFamily: 'monospace', fontSize: '15px', color: '#f4ecd8', backgroundColor: '#0f1220', padding: { x: 8, y: 4 }
     }).setOrigin(0.5).setScrollFactor(0).setAlpha(0).setDepth(60);
 
     addMuteToggle(this).setScrollFactor(0).setDepth(60);
+    var fsIcon = addFullscreenToggle(this); if (fsIcon) fsIcon.setScrollFactor(0).setDepth(60);
 
     // ---- pause overlay ----
     this.isPaused = false;
@@ -1201,7 +1264,9 @@
 
     var self = this;
     this.time.delayedCall(300, function () {
-      fadeToScene(self, 'End', { win: true, score: self.score, levelId: self.levelId, isFinal: self.levelId === LEVELS.length });
+      // lives is included so the next wing (if any) can continue with it —
+      // see "Next Wing" in EndScene, which is the only place that reads it.
+      fadeToScene(self, 'End', { win: true, score: self.score, levelId: self.levelId, isFinal: self.levelId === LEVELS.length, lives: self.lives });
     });
   };
 
@@ -1314,11 +1379,15 @@
 
     this.add.text(W / 2, 240, 'Score: ' + data.score, { fontFamily: 'monospace', fontSize: '16px', color: '#f4ecd8' }).setOrigin(0.5);
     this.add.text(W / 2, 265, 'Best on this wing: ' + (sv.scores[data.levelId] || 0), { fontFamily: 'monospace', fontSize: '13px', color: '#a67c2e' }).setOrigin(0.5);
+    if (win && !data.isFinal && sv.unlocked > data.levelId) {
+      this.add.text(W / 2, 288, 'Carrying ' + data.lives + ' ' + (data.lives === 1 ? 'life' : 'lives') + ' into the next wing', { fontFamily: 'monospace', fontSize: '12px', color: '#4fd1c5' }).setOrigin(0.5);
+    }
 
     var self = this;
     var options = [];
     if (win && !data.isFinal && sv.unlocked > data.levelId) {
-      options.push({ label: isTouchDevice ? '[ TAP: Next Wing ]' : '[ SPACE: Next Wing ]', color: '#4fd1c5', action: function () { fadeToScene(self, 'Game', { levelId: data.levelId + 1 }); } });
+      // Carries the lives you finished this wing with into the next one.
+      options.push({ label: isTouchDevice ? '[ TAP: Next Wing ]' : '[ SPACE: Next Wing ]', color: '#4fd1c5', action: function () { fadeToScene(self, 'Game', { levelId: data.levelId + 1, lives: data.lives }); } });
     } else if (!win) {
       options.push({ label: isTouchDevice ? '[ TAP: Retry ]' : '[ SPACE: Retry ]', color: '#d9a441', action: function () { fadeToScene(self, 'Game', { levelId: data.levelId }); } });
     }
@@ -1333,6 +1402,7 @@
 
     this.input.keyboard.once('keydown-SPACE', function () { SFX.click(); options[0].action(); });
     addMuteToggle(this);
+    addFullscreenToggle(this);
   };
 
   // =========================================================================
@@ -1344,7 +1414,9 @@
     height: H,
     parent: 'game-container',
     backgroundColor: '#0f1220',
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    // fullscreenTarget is #game-shell (not just the canvas) so the on-screen
+    // touch controls, which live alongside the canvas, stay visible in fullscreen.
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, fullscreenTarget: 'game-shell' },
     physics: { default: 'arcade', arcade: { gravity: { y: 900 }, debug: false } },
     render: { pixelArt: true, antialias: false }, // crisp scaling for the pixel-art sprites
     input: { activePointers: 3 }, // allow multiple simultaneous touch buttons (e.g. move + jump)
